@@ -46,7 +46,7 @@ usethis::use_test("app")
 # Documentation
 
 ## Vignette ----
-usethis::use_vignette("toxbox")
+usethis::use_vignette("plumesbox")
 devtools::build_vignettes()
 
 ## Code Coverage----

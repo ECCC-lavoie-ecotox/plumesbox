@@ -1,3 +1,3 @@
-# toxbox 0.0.1
+# plumesbox 0.0.1
 
 * Initial CRAN submission.

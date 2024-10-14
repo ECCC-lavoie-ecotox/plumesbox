@@ -1,4 +1,4 @@
-Package: toxbox
+Package: plumesbox
 Title: Application and utils for contaminants data processing
 Version: 0.0.1
 Authors@R: c(
@@ -11,8 +11,8 @@ Authors@R: c(
 Description: This package aims at facilitate data processing and models
     building in order to spend more time on the field.
 License: MIT + file LICENSE
-URL: https://github.com/ECCC-lavoie-ecotox/toxbox
-BugReports: https://github.com/ECCC-lavoie-ecotox/toxbox/issues
+URL: https://github.com/ECCC-lavoie-ecotox/plumesbox
+BugReports: https://github.com/ECCC-lavoie-ecotox/plumesbox/issues
 Depends: 
     R (>= 4.0)
 Imports: 

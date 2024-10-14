@@ -1,7 +1,6 @@
 pandoc: 3.1.11
-pkgdown: 2.1.0
+pkgdown: 2.1.1
 pkgdown_sha: ~
 articles:
   articles/censored_value: censored_value.html
-  articles/import-MET-THg-23-19: import-MET-THg-23-19.html
-last_built: 2024-09-06T14:51Z
+last_built: 2024-10-14T23:14Z

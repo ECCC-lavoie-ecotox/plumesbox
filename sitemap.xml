@@ -2,7 +2,6 @@
 <url><loc>/404.html</loc></url>
 <url><loc>/LICENSE.html</loc></url>
 <url><loc>/articles/censored_value.html</loc></url>
-<url><loc>/articles/import-MET-THg-23-19.html</loc></url>
 <url><loc>/articles/index.html</loc></url>
 <url><loc>/authors.html</loc></url>
 <url><loc>/index.html</loc></url>
@@ -15,8 +14,6 @@
 <url><loc>/reference/check_fields_pkeys.html</loc></url>
 <url><loc>/reference/detect_cens.html</loc></url>
 <url><loc>/reference/fct_start.html</loc></url>
-<url><loc>/reference/get_db.html</loc></url>
-<url><loc>/reference/get_db_cached.html</loc></url>
 <url><loc>/reference/get_tbl_info.html</loc></url>
 <url><loc>/reference/get_tbl_notnulls.html</loc></url>
 <url><loc>/reference/get_tbl_pkeys.html</loc></url>

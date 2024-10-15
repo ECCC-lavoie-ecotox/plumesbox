@@ -2,17 +2,29 @@
 % Please edit documentation in R/db_tbl.R
 \name{bulk_insert_entry}
 \alias{bulk_insert_entry}
-\title{Add entry within specified table}
+\title{Insert multiple rows into a table}
 \usage{
 bulk_insert_entry(con = NULL, tbl = NULL, data = NULL)
 }
 \arguments{
-\item{con}{connexion object returned by DBI::dbConnect()}
+\item{con}{DBI connection object.}
 
-\item{tbl}{a character name of the table}
+\item{tbl}{Name of the target table.}
 
-\item{data}{a data.frame}
+\item{data}{A data.frame with rows to insert.}
+}
+\value{
+None.
 }
 \description{
-Add entry within specified table
+Performs bulk insertion into a table using transactions.
+Rolls back if any errors occur.
+}
+\examples{
+\dontrun{
+con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+data <- data.frame(id = 1:3, name = c("A", "B", "C"), value = c(10, 20, 30))
+bulk_insert_entry(con, "my_table", data)
+}
+
 }

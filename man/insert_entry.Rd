@@ -2,30 +2,28 @@
 % Please edit documentation in R/db_tbl.R
 \name{insert_entry}
 \alias{insert_entry}
-\alias{modify_entry}
-\alias{delete_entry}
-\title{Add entry within specified table}
+\title{Insert a new row into a table}
 \usage{
 insert_entry(con = NULL, tbl = NULL, ...)
-
-modify_entry(con = NULL, tbl = NULL, ...)
-
-delete_entry(con = NULL, tbl = NULL, ...)
 }
 \arguments{
-\item{con}{connexion object returned by DBI::dbConnect()}
+\item{con}{DBI connection object.}
 
-\item{tbl}{a character name of the table}
+\item{tbl}{Name of the target table.}
 
-\item{...}{a vector of column names in the specified table}
+\item{...}{Named column-value pairs to insert into the table.}
+}
+\value{
+None.
 }
 \description{
-Add entry within specified table
+Inserts a new row into a specified table in the database.
+It ensures that fields, primary keys, and NOT NULL constraints are valid before inserting.
 }
-\section{Functions}{
-\itemize{
-\item \code{modify_entry()}: Modify entry within specified table.
+\examples{
+\dontrun{
+con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+insert_entry(con, "my_table", id = 1, name = "Sample", value = 10)
+}
 
-\item \code{delete_entry()}: Delete entry within specified table.
-
-}}
+}

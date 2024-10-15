@@ -2,16 +2,28 @@
 % Please edit documentation in R/db_con.R
 \name{init_con}
 \alias{init_con}
-\title{Init sqlite connexion}
+\title{Initialize the PLUMES database connection}
 \usage{
 init_con(local = NULL)
 }
+\arguments{
+\item{local}{Optional. Path to a local SQLite database file. Defaults to \code{NULL} for the internal path.}
+}
+\value{
+A DBI connection object.
+}
 \description{
-Init sqlite connexion
+Connects to the PLUMES database file. If \code{local} is provided, it uses the specified file path,
+otherwise it defaults to the internal database path and name.
+The function ensures the database file exists before connecting.
 }
 \examples{
 \dontrun{
- init_con()
+# Connect to a local database
+con <- init_con(local = "path/to/local/database.sqlite")
+
+# Connect using default settings
+con <- init_con()
 }
 
 }

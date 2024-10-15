@@ -1,78 +1,112 @@
-#' Add entry within specified table
+#' Insert a new row into a table
 #'
-#' @param con connexion object returned by DBI::dbConnect()
-#' @param tbl a character name of the table
-#' @param ... a vector of column names in the specified table
+#' Inserts a new row into a specified table in the database.
+#' It ensures that fields, primary keys, and NOT NULL constraints are valid before inserting.
 #'
-#' @export
+#' @param con DBI connection object.
+#' @param tbl Name of the target table.
+#' @param ... Named column-value pairs to insert into the table.
 #' 
-insert_entry <- function(con = NULL, tbl = NULL, ...){
+#' @return None.
+#' 
+#' @examples
+#' \dontrun{
+#' con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#' insert_entry(con, "my_table", id = 1, name = "Sample", value = 10)
+#' }
+#' 
+#' @export
+insert_entry <- function(con = NULL, tbl = NULL, ...) {
     fields <- list(...)
-
+    
     check_fields_exist(con, tbl, names(fields))
     check_fields_pkeys(con, tbl, names(fields))
     check_fields_notnulls(con, tbl, names(fields))
-
+    
     ddl <- glue::glue_sql("INSERT INTO { tbl } ({ names(fields)* }) VALUES ({ fields* });", .con = con)
-    res <- DBI::dbSendStatement(con, ddl) 
+    res <- DBI::dbSendStatement(con, ddl)
     
     on.exit(DBI::dbClearResult(res))
 }
 
-#' Add entry within specified table
+#' Insert multiple rows into a table
 #'
-#' @param con connexion object returned by DBI::dbConnect()
-#' @param tbl a character name of the table
-#' @param data a data.frame
+#' Performs bulk insertion into a table using transactions. 
+#' Rolls back if any errors occur.
 #'
-#' @export
+#' @param con DBI connection object.
+#' @param tbl Name of the target table.
+#' @param data A data.frame with rows to insert.
 #' 
-bulk_insert_entry <- function(con = NULL, tbl = NULL, data = NULL){
+#' @return None.
+#'
+#' @examples
+#' \dontrun{
+#' con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#' data <- data.frame(id = 1:3, name = c("A", "B", "C"), value = c(10, 20, 30))
+#' bulk_insert_entry(con, "my_table", data)
+#' }
+#' 
+#' @export
+bulk_insert_entry <- function(con = NULL, tbl = NULL, data = NULL) {
     tryCatch({
         RSQLite::dbBegin(con, name = "bulk_insert")
-        purrr::pmap(data, ~with(list(...),{
-            insert_entry(con = con, tbl = tbl,...)
+        purrr::pmap(data, ~with(list(...), {
+            insert_entry(con = con, tbl = tbl, ...)
         }))
         RSQLite::dbCommit(con, name = "bulk_insert")
-    }, error = \(e){
+    }, error = \(e) {
         RSQLite::dbRollback(con, name = "bulk_insert")
         cli::cli_abort(e)
     })
 }
 
-#' @describeIn insert_entry Modify entry within specified table.
-#' @export
+#' Modify a row in a table
+#'
+#' Updates an existing row based on primary keys. Only one row is updated.
+#'
+#' @param con DBI connection object.
+#' @param tbl Name of the target table.
+#' @param ... Named column-value pairs for the row to update.
+#'
+#' @return None.
 #' 
-modify_entry <- function(con = NULL, tbl = NULL, ...){
+#' @examples
+#' \dontrun{
+#' con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#' modify_entry(con, "my_table", id = 1, name = "Updated", value = 20)
+#' }
+#' 
+#' @export
+modify_entry <- function(con = NULL, tbl = NULL, ...) {
     fields <- list(...)
-
+    
     check_fields_exist(con, tbl, names(fields))
     check_fields_pkeys(con, tbl, names(fields))
-
+    
     pkeys_tbl <- get_tbl_pkeys(con, tbl)
     target_row <- do.call("search_tbl", list(con = con, tbl = tbl) |> append(fields[pkeys_tbl]))
-
-    if(nrow(target_row) > 1L){
+    
+    if (nrow(target_row) > 1L) {
         cli::cli_abort("More than one row found with { fields[pkeys_tbl] }")
     } else {
-        
         pkeys_values <- fields[which(names(fields) %in% pkeys_tbl)]
         update_values <- fields[-which(names(fields) %in% pkeys_tbl)]
-
-        update_entries <- purrr::map(names(update_values), \(n){
+        
+        update_entries <- purrr::map(names(update_values), \(n) {
             glue::glue("{n} = ${n}")
         }) |> glue::glue_sql_collapse(",")
-
-        criterias <- purrr::map(names(pkeys_values), \(n){
+        
+        criterias <- purrr::map(names(pkeys_values), \(n) {
             glue::glue("{n} = ${n}")
         }) |> glue::glue_sql_collapse(" AND ")
-
+        
         ddl <- glue::glue_sql("
             UPDATE { tbl }
             SET { update_entries }
             WHERE { criterias };
         ", .con = con)
-
+        
         res <- DBI::dbSendStatement(con, ddl)
         DBI::dbBind(res, fields)
         
@@ -80,31 +114,45 @@ modify_entry <- function(con = NULL, tbl = NULL, ...){
     }
 }
 
-#' @describeIn insert_entry Delete entry within specified table.
-#' @export
+#' Delete a row from a table
+#'
+#' Deletes a row from a table based on primary keys.
+#'
+#' @param con DBI connection object.
+#' @param tbl Name of the target table.
+#' @param ... Named primary key column-value pairs for the row to delete.
+#'
+#' @return None.
 #' 
-delete_entry <- function(con = NULL, tbl = NULL, ...){
+#' @examples
+#' \dontrun{
+#' con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#' delete_entry(con, "my_table", id = 1)
+#' }
+#' 
+#' @export
+delete_entry <- function(con = NULL, tbl = NULL, ...) {
     fields <- list(...)
-
+    
     check_fields_exist(con, tbl, names(fields))
     check_fields_pkeys(con, tbl, names(fields))
-
+    
     pkeys_tbl <- get_tbl_pkeys(con, tbl)
-    target_row <- do.call("search_tbl", list(con =  con, tbl = tbl) |> append(fields[pkeys_tbl]))
-
-    if(nrow(target_row) > 1L){
+    target_row <- do.call("search_tbl", list(con = con, tbl = tbl) |> append(fields[pkeys_tbl]))
+    
+    if (nrow(target_row) > 1L) {
         cli::cli_abort("More than one row found with { fields[pkeys_tbl] }")
     } else {
-        criterias <- purrr::map(names(fields[pkeys_tbl]), \(n){
+        criterias <- purrr::map(names(fields[pkeys_tbl]), \(n) {
             glue::glue("{n} = ${n}")
         }) |> glue::glue_sql_collapse(" AND ")
-
+        
         ddl <- glue::glue_sql("
             DELETE 
             FROM { tbl }
             WHERE { criterias };
         ", .con = con)
-
+        
         res <- DBI::dbSendStatement(con, ddl)
         DBI::dbBind(res, fields)
         
@@ -112,6 +160,19 @@ delete_entry <- function(con = NULL, tbl = NULL, ...){
     }
 }
 
+
+#' Retrieve data from a specified table in the database
+#'
+#' This function reads and returns all the rows from a specified table in the database.
+#' It uses [DBI::dbReadTable()] to extract the contents of the table and return them as a data frame.
+#'
+#' @param con A DBI connection object returned by [DBI::dbConnect()]. This connection is used to interact with the database.
+#' @param tbl A character string specifying the name of the target table in the database.
+#'
+#' @return A data frame containing all rows and columns from the specified table.
+#' If the table is empty or does not exist, an error or empty data frame will be returned.
+#'
+#' @export
 get_tbl <- function(con = NULL, tbl = NULL) {
     DBI::dbReadTable(con, tbl)
 }

@@ -1,0 +1,247 @@
+---
+title: "Importation des résultats de laboratoire MET-THg-23-19"
+author: "Steve Vissault"
+date: "2024-08-01"
+output: 
+  html_document:
+    highlight: kate
+    toc: no
+---
+
+```{r}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+Ce document permet d'importer les mesures de laboratoire pour le rapport MET-Thg-23-19
+
+# Faire une sauvegarde de la base de données
+
+Première étape, on veut être en mesure de restaurer la base de données si l'importation introduit des erreurs dans la base de données.
+
+```{r}
+db_path <- "Z:/07-Données BD/Database/contaminants-rlavoie-eccc.sqlite"
+
+db_bak <- stringr::str_replace(
+    db_path, 
+    pattern = ".sqlite", 
+    replacement = glue::glue("-{format(Sys.Date(), '%Y%m%d')}.bak.sqlite")
+)
+
+file.copy(db_path, db_bak)
+```
+
+# Chargements des résultats du laboratoire
+
+```{r}
+lab_results_file <- "Z:/03-Labo/Results Reports/À entrer dans la BD/MET-THg-23-19 - RALA01-2023.xlsx"
+
+# Informations sur les échantillons
+sampleInfoLab <- readxl::read_xlsx(lab_results_file, "SampleInfo")
+
+# Informations sur les mesures
+measurementsLab <- readxl::read_xlsx(lab_results_file, "SampleData") 
+```
+
+# Connection à la base de données
+
+```{r}
+con <- toxbox::init_con()
+```
+
+# Injection des métadonnées sur le rapport et le projet
+
+```{r}
+report <- data.frame(
+    id_report = "MET-Thg-23-19",
+    id_project = "RALA01-2023",
+    report_date = "2024-07-31",
+    report_access_path = stringr::str_replace("Z:/03-Labo/Results Reports/À entrer dans la BD/MET-THg-23-19 - RALA01-2023.xlsx", "À entrer dans la BD", "Saisie dans la BD")
+)
+```
+
+On valide si le projet existe déjà dans la base de données
+
+```{r}
+toxbox::search_tbl(con, "project", id_project = "RALA01-2023")
+```
+
+Il existe déjà dans la base de données. On peut donc importer les métadonnées du rapport qui seront attaché à ce projet.
+
+```{r}
+DBI::dbWriteTable(con, "report", report, append = TRUE)
+```
+
+# Préparation des données sur les échantillons
+
+```{r}
+field_sample <- sampleInfoLab |> dplyr::select(
+    id_lab_sample = SampleID,
+    id_field_sample = ClientID,
+    collection_date = CollectionDate,
+    id_site = Location,
+    id_species = Species,
+    tissue = Tissue,
+    age = Age
+)
+```
+
+# Préparation des données sur les mesures
+
+```{r}
+measurements <- measurementsLab |> dplyr::select(
+    id_lab_sample = SampleID,
+    id_field_sample = ClientID,
+    pmoisture = `% Moisture`,
+    value = `Total Mercury (µg/g (dry))`
+) |> dplyr::mutate(
+    id_analyte = "thg_dw"
+)
+```
+
+# Établir la correspondance avec les sites existants 
+
+On valide si le ou les site(s) de collecte des échantillons existent dans la base de données
+
+On isole dans un premier temps les sites présent dans les résultats envoyés par le laboratoire.
+
+```{r}
+(sitesLab <- dplyr::distinct(sampleInfoLab, Location, Latitude, Longitude))
+```
+
+On recherche dans la base de données les sites à l'aide de mots clés.
+
+```{r}
+betchouanes_site_db <- toxbox::search_tbl(con, "sites", id_site = "%betchouanes%")
+mingan_site_db <- toxbox::search_tbl(con, "sites", id_site = "%mingan%")
+```
+
+Après avoir chercher les sites dans la base de données, nous pouvons nous apercevoir que le site de betchouanes est déjà renseigné dans la base de données mais pas le site de Longue-Pointe-de-Mingan. On ajoute donc ce site.
+
+```{r}
+add_site <- sitesLab |> 
+    dplyr::filter(Location == "Longue-Pointe-de-Mingan") |> 
+    dplyr::select(
+        id_site = Location,
+        lat = Latitude,
+        lon = Longitude
+    ) |>
+    dplyr::mutate(
+        province = 'Québec',
+        srid = 4326
+    )
+
+DBI::dbWriteTable(con, "sites", add_site, append = TRUE)
+```
+
+On vérifie que le site a bel et bien été ajouté dans la base de données.
+
+```{r}
+toxbox::search_tbl(con, "sites", id_site = "Longue-Pointe-de-Mingan")
+```
+
+```{r}
+field_sample <- field_sample |>
+    dplyr::mutate(
+        id_site = dplyr::case_when(
+            stringr::str_detect(id_site, "Ile a Calculot des Betchouanes") == TRUE ~ betchouanes_site_db$id_site,
+            .default = id_site
+        )
+    )
+``` 
+
+# Établir la correspondance avec les espèces présentes dans la base de données
+
+On liste les espèces en premier les espèces présente dans les résultats de laboratoire.
+
+```{r}
+unique(field_sample$id_species)
+```
+
+On compare avec la liste des espèces présentes dans la base de données.
+
+```{r}
+DBI::dbReadTable(con, "species")
+```
+
+On créé un tableau avec les espèces qui ne sont pas présentes dans la base de données.
+
+```{r}
+new_species <- tibble::tribble(
+   ~org_species, ~id_species, ~organism, ~genus, ~species, ~vernacular_fr, ~vernacular_en,
+  "Alose sp.", "SHSP", "Fish", "Alosa",   "Alosa sp.", "Alose", "Shad",
+  "Gadidae sp.", "COSP", "Fish", "Gadidae", "Gadidae sp.", "Morue", "Cod",
+  "Lompenie tachete", "DASH", "Fish", "Gadidae", "Leptoclinus maculatus", "Lompénie tachetée", "Daubed shanny"
+)
+```
+
+On ajoute ces espèces dans la base de données
+
+```{r}
+DBI::dbWriteTable(con, "species", dplyr::select(new_species, -org_species)
+, append = TRUE)
+```
+
+On valide visuellement que les nouvelles espèces se retrouvent bien dans la base de données
+
+```{r}
+DBI::dbReadTable(con, "species")
+```
+
+On effectue la correspondance entre les codes espèces du rapport de laboratoire et ceux de la base de données. 
+
+```{r}
+field_sample <- field_sample |> dplyr::mutate(
+    id_species = dplyr::case_when(
+        id_species == "Alose sp." ~ "SHSP",
+        id_species == "Capelan" ~ "CAPE",
+        id_species == "Gadidae sp." ~ "COSP",
+        id_species == "Lancon" ~ "SAND",
+        id_species == "Lompenie tachete" ~ "DASH",
+        .default = NA
+    )
+) |> dplyr::filter(!is.na(id_species))
+```
+
+# Injection des mesures du laboratoire
+
+Les étapes précédentes ont permis de mettre à jour les tables de références pour les sites et les espèces. 
+
+On peut maintenant procéder à importer les données sur les échantillons et les mesures.
+
+## Field samples
+
+```{r}
+dplyr::select(field_sample, id_field_sample, collection_date, id_site, id_species, age, tissue) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "field_sample", data, append = TRUE))()
+```
+
+## Lab samples
+
+```{R}
+dplyr::select(field_sample, id_lab_sample) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "lab_sample", data, append = TRUE))()
+```
+
+## Lab field samples
+
+Cette table effectue la liaison entre les échantillons de laboratoire et les échantillons de terrain.
+
+```{R}
+dplyr::select(field_sample, id_lab_sample, id_field_sample) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "lab_field_sample", data, append = TRUE))()
+```
+
+## Lab measurements
+
+```{R}
+# Set method detection limit
+MDL <- 0.0001
+
+dplyr::select(measurements, id_lab_sample, id_analyte, value, percent_moisture = pmoisture) |> 
+    dplyr::mutate(is_censored = ifelse(value > MDL, 0, 1)) |>
+    dplyr::mutate(id_report = report$id_report) |> 
+    (\(data) DBI::dbWriteTable(con, "lab_measurement", data, append = TRUE))()
+```

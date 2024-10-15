@@ -4,7 +4,7 @@
 \alias{init_con}
 \title{Init sqlite connexion}
 \usage{
-init_con()
+init_con(local = NULL)
 }
 \description{
 Init sqlite connexion

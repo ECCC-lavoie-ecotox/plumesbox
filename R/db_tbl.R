@@ -176,3 +176,27 @@ delete_entry <- function(con = NULL, tbl = NULL, ...) {
 get_tbl <- function(con = NULL, tbl = NULL) {
     DBI::dbReadTable(con, tbl)
 }
+
+#' Retrieve joined data from the database
+#'
+#' This function retrieves data by performing a series of `INNER JOIN` operations across multiple tables in the database, 
+#' including `lab_measurement`, `analyte`, `lab_sample`, `lab_field_sample`, `field_sample`, `sites`, and `species`.
+#' The result is a combined dataset containing related information from all these tables.
+#'
+#' @param con A DBI connection object. The database connection used to query the data.
+#'
+#' @return A lazy data frame (tibble) representing the joined data. The query is not executed until explicitly requested by the user (e.g., with `dplyr::collect()`).
+#'
+#' @export
+get_db <- function(con = NULL) {
+    dplyr::tbl(
+        con, dplyr::sql("
+        SELECT * FROM lab_measurement
+            INNER JOIN analyte USING (id_analyte)
+            INNER JOIN lab_sample USING (id_lab_sample)
+            INNER JOIN lab_field_sample USING (id_lab_sample)
+            INNER JOIN field_sample USING (id_field_sample)
+            INNER JOIN sites USING (id_site)
+            INNER JOIN species USING (id_species)")
+    )
+}

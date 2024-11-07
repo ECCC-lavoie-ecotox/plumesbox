@@ -95,6 +95,12 @@
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"ECCC-lavoie-ecotox/plumesbox"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="launch-the-shiny-app">Launch the Shiny app<a class="anchor" aria-label="anchor" href="#launch-the-shiny-app"></a>
+</h2>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">plumesbox</span><span class="fu">::</span><span class="fu"><a href="reference/run_app.html">run_app</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="read-the-documentation">Read the documentation<a class="anchor" aria-label="anchor" href="#read-the-documentation"></a>
 </h2>
 <p>All functions are documented at this address: <a href="https://eccc-lavoie-ecotox.github.io/plumesbox" class="external-link uri">https://eccc-lavoie-ecotox.github.io/plumesbox</a></p>
@@ -103,13 +109,13 @@
 <h2 id="reloading-a-shiny-application-on-source-changes">Reloading a Shiny application on source changes<a class="anchor" aria-label="anchor" href="#reloading-a-shiny-application-on-source-changes"></a>
 </h2>
 <p>Install the following aptitude libraries</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">sudo</span> apt-get install ruby</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">sudo</span> apt-get install ruby-dev</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">sudo</span> gem install bundler</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">sudo</span> apt-get install ruby</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">sudo</span> apt-get install ruby-dev</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">sudo</span> gem install bundler</span></code></pre></div>
 <p>Install gems</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="ex">bundle</span> install</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">bundle</span> install</span></code></pre></div>
 <p>Start application and watch files in R folder</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">bundle</span> exec guard</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="ex">bundle</span> exec guard</span></code></pre></div>
 </div>
 </div>
   </div>

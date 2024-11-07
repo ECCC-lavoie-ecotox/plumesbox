@@ -14,6 +14,12 @@ You can install the development version of plumesbox from [GitHub](https://githu
 devtools::install_github("ECCC-lavoie-ecotox/plumesbox")
 ```
 
+## Launch the Shiny app
+
+```r
+plumesbox::run_app()
+```
+
 ## Read the documentation
 
 All functions are documented at this address: https://eccc-lavoie-ecotox.github.io/plumesbox

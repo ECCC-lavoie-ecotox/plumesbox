@@ -1,0 +1,266 @@
+---
+title: "Importation des résultats de laboratoire CHEM-OC-24-04"
+author: "Steve Vissault"
+date: "2024-08-01"
+output: 
+  html_document:
+    highlight: kate
+    toc: no
+---
+
+
+Ce document permet d'importer les mesures de laboratoire pour le rapport CHEM-OC-24-04
+
+# Faire une sauvegarde de la base de données
+
+```{r}
+# path = Z:/07-Données BD/Database/
+db_path <- "contaminants-rlavoie-eccc.sqlite"
+
+db_bak <- stringr::str_replace(
+    db_path, 
+    pattern = ".sqlite", 
+    replacement = glue::glue("-{format(Sys.Date(), '%Y%m%d')}.bak.sqlite")
+)
+
+file.copy(db_path, db_bak)
+```
+
+
+# Chargements des résultats du laboratoire
+
+```{r}
+lab_results_file <- "/home/steve/git/plumesbox/vignettes/articles/CHEM-OC-24-04.xlsx"
+
+# Informations sur les échantillons
+sampleInfoLab <- readxl::read_xlsx(lab_results_file, "SampleInfo")
+
+# Informations sur les mesures
+measurementsLab <- readxl::read_xlsx(lab_results_file, "SampleData", skip = 1) 
+```
+
+# Connection à la base de données
+
+```{r}
+con <- plumesbox::init_con()
+```
+
+# Injection des métadonnées sur le rapport et le projet
+
+```{r}
+report <- data.frame(
+    id_report = "CHEM-OC-24-04",
+    id_project = "RALA01-2024",
+    report_date = "2024-10-24"
+)
+```
+
+```{r}
+plumesbox::search_tbl(con, "project", id_project = "RALA01-2024")
+```
+
+L'identifiant du projet `RALA01-2024` n'existe pas, on ajoute donc cette nouvelle entrée:
+
+```{R}
+project <- data.frame(
+    id_project = "RALA01-2024",
+    title = "Programme de suivi écotoxicologique d'oiseaux marins du Saint-Laurent en support au Plan d'action du Saint-Laurent",
+    investigator = "Raphael Lavoie"
+)
+DBI::dbWriteTable(con, "project", project, append = TRUE)
+```
+
+Il existe déjà dans la base de données. On peut donc importer les métadonnées du rapport qui seront attaché à ce projet.
+
+```{r}
+DBI::dbWriteTable(con, "report", report, append = TRUE)
+```
+
+# Préparation des données sur les échantillons
+
+```{r}
+field_sample <- sampleInfoLab |> dplyr::select(
+    id_lab_sample = SampleID,
+    id_field_sample = ClientID,
+    collection_date = CollectionDate,
+    id_site = Location,
+    id_species = Species,
+    tissue = Tissue,
+    age = Age
+)
+```
+
+# Préparation des données sur les mesures
+
+```{r}
+measurements <- measurementsLab |> 
+    tidyr::pivot_longer(`b-TBECH/BDE15`:PCB209) |>
+    dplyr::select(
+        id_lab_sample = SampleID,
+        id_field_sample = ClientID,
+        pmoisture = `% Moisture`,
+        plipid = `% Lipids`,
+        Analyte = name,
+        value
+    )
+```
+
+# Établir la correspondance avec les analytes
+
+```{R}
+analytesRapport <- readxl::read_xlsx(lab_results_file, "AnalyteInfo") |>
+    dplyr::mutate(CASNumber = dplyr::na_if(CASNumber, "NA"))
+
+analytesDB <- plumesbox::get_tbl(con, "analyte")
+table(analytesRapport$CASNumber %in% analytesDB$casid)
+
+analytesRapport <- analytesRapport |> 
+    dplyr::left_join(
+        dplyr::select(analytesDB, id_analyte, casid), 
+        by = dplyr::join_by(CASNumber == casid),
+        na_matches = "never"
+    )
+```
+
+On isole les analytes qui n'ont pas de correspondance pour faire une correspondance manuel.
+
+```{R}
+dplyr::filter(analytesRapport, is.na(id_analyte))
+analytesRapport <- analytesRapport |> dplyr::mutate(id_analyte = dplyr::case_when(
+    Analyte == "b-TBECH/BDE15" ~ "bde_15_b_btech",
+    Analyte == "BDE99" ~ "bde_99",
+    Analyte == "BDE154/BB153" ~ "bde_154",
+    Analyte == "a-Hexachlorocyclohexane" ~ "a_hexachlorocyclohexane",
+    Analyte == "b-Hexachlorocyclohexane" ~ "b_hexachlorocyclohexane",
+    Analyte == "trans-Nonachlor" ~ "trans_nonachlor",
+    Analyte == "PCB17/18" ~ "pcb_17_18",
+    Analyte == "PCB28/31" ~ "pcb_28_31",
+    .default = id_analyte
+)) |> dplyr::distinct()
+```
+
+On ajoute les correspondances dans le `data.frame` des measurements
+
+```{R}
+measurements <- measurements |> dplyr::left_join(
+    dplyr::select(analytesRapport, Analyte, MDL, id_analyte),
+    na_matches = "na"
+)
+```
+
+Voici un exemple si l'analyte PCB28/31 n'était pas documenté dans la base de données.
+
+Un analyte n'est pas présent dans la table de référence des analytes de la base de données: PCB28/31. On veut donc ajouter cette analyte dans la table de référence
+
+```{R, eval = FALSE}
+names(analytesDB)
+new_analyte_entry <- data.frame(
+    id_analyte = "pcb_28_31",
+    name = "PCB28/31",
+    family = "PCB",
+    unit = "µg/g",
+    is_dry_weight = 0,
+    on_isolated_lipid = 0
+)
+
+DBI::dbWriteTable(con, "analyte", new_analyte_entry, append = TRUE)
+```
+
+À présent l'ensemble des analytes pour ce rapport a une correspondance dans la base de données PLUMES. 
+
+# Établir la correspondance avec les sites existants 
+
+On valide si le ou les site(s) de collecte des échantillons existent dans la base de données
+
+On isole dans un premier temps les sites présent dans les résultats envoyés par le laboratoire.
+
+```{r}
+(sitesLab <- dplyr::distinct(sampleInfoLab, Location, Latitude, Longitude))
+```
+
+On recherche dans la base de données les sites à l'aide de mots clés.
+
+```{r}
+site <- plumesbox::search_tbl(con, "sites", id_site = "%Bonaventure%")
+```
+
+On ajoute l'id du site pour établir la correspondance
+
+```{R}
+field_sample <- field_sample |> dplyr::mutate(id_site = "Bonaventure")
+```
+
+# Établir la correspondance avec les espèces présentes dans la base de données
+
+On liste les espèces en premier les espèces présente dans les résultats de laboratoire.
+
+```{r}
+unique(field_sample$id_species)
+```
+
+On recherche si cette espèce est présente dans la base de données
+
+```{r}
+plumesbox::get_tbl(con, "species")
+plumesbox::search_tbl(con, "species", vernacular_en = "Gannet")
+```
+
+On effectue la correspondance entre les codes espèces du rapport de laboratoire et ceux de la base de données. 
+
+```{r}
+field_sample <- field_sample |> dplyr::mutate(
+    id_species = "NOGA"
+) 
+```
+
+# Injection des mesures du laboratoire
+
+Les étapes précédentes ont permis de mettre à jour les tables de références pour les sites et les espèces. 
+
+On peut maintenant procéder à importer les données sur les échantillons et les mesures.
+
+## Field samples
+
+```{r}
+dplyr::select(field_sample, id_field_sample, collection_date, id_site, id_species, age, tissue) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "field_sample", data, append = TRUE))()
+```
+
+## Lab samples
+
+```{R}
+dplyr::select(field_sample, id_lab_sample) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "lab_sample", data, append = TRUE))()
+```
+
+## Lab field samples
+
+Cette table effectue la liaison entre les échantillons de laboratoire et les échantillons de terrain.
+
+```{R}
+dplyr::select(field_sample, id_lab_sample, id_field_sample) |> 
+    dplyr::distinct() |> 
+    (\(data) DBI::dbWriteTable(con, "lab_field_sample", data, append = TRUE))()
+```
+
+## Lab measurements
+
+On détermine si la valeur est censuré en fonction du seuil de MDL
+
+```{R}
+# Set method detection limit
+measurements2 <- dplyr::select(measurements, id_lab_sample, id_analyte, value, MDL, percent_moisture = pmoisture) |> 
+    dplyr::mutate(is_censored = ifelse(value > MDL, 0, 1)) |>
+    dplyr::mutate(id_report = report$id_report) |>
+    dplyr::select(-MDL) |>
+    dplyr::filter(!is.na(value))
+    dplyr::distinct()
+
+janitor::get_dupes(measurements2, id_lab_sample, id_analyte)
+```
+
+```{R}
+DBI::dbWriteTable(con, "lab_measurement", measurements, append = TRUE)
+```

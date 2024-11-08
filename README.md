@@ -45,3 +45,13 @@ Start application and watch files in R folder
 ```bash
 bundle exec guard
 ```
+
+## TODO: Steve 
+
+- Ajuster les dates de collections des échantillons en fonction de ceux de minamata
+- Ajouter les données corriger par Roxane
+- Ajouter les dates manquantes manuellement dans la base de données
+- Mieux documenter la procédure d'importation des données
+
+On se garde 1 heure pour ajouter les coordonnées des sites et corriger les unités
+

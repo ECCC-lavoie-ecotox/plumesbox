@@ -45,7 +45,7 @@ measurementsLab <- readxl::read_xlsx(lab_results_file, "SampleData")
 # Connection à la base de données
 
 ```{r}
-con <- toxbox::init_con()
+con <- plumesbox::init_con()
 ```
 
 # Injection des métadonnées sur le rapport et le projet
